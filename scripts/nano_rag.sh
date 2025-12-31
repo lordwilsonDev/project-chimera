@@ -11,7 +11,7 @@
 
 set -e
 
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+SCRIPT_DIR="$HOME/project-chimera/scripts"
 NANO_DIR="$HOME/nano_memory"
 VENV_DIR="$HOME/.sovereign_trinity_app/venv"
 
