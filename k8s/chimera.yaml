@@ -1,0 +1,347 @@
+# Kubernetes Namespace
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: chimera
+  labels:
+    app: chimera
+    environment: production
+---
+# Resource Quota
+apiVersion: v1
+kind: ResourceQuota
+metadata:
+  name: chimera-quota
+  namespace: chimera
+spec:
+  hard:
+    requests.cpu: "8"
+    requests.memory: 16Gi
+    limits.cpu: "16"
+    limits.memory: 32Gi
+    pods: "50"
+---
+# Chat Server Deployment
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: chat-server
+  namespace: chimera
+  labels:
+    app: chat-server
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: chat-server
+  template:
+    metadata:
+      labels:
+        app: chat-server
+    spec:
+      containers:
+        - name: chat-server
+          image: chimera/chat-server:latest
+          ports:
+            - containerPort: 8080
+          env:
+            - name: PORT
+              value: "8080"
+            - name: NATS_URL
+              value: "nats://nats:4222"
+            - name: REDIS_URL
+              value: "redis://redis:6379"
+          resources:
+            requests:
+              cpu: "250m"
+              memory: "256Mi"
+            limits:
+              cpu: "1000m"
+              memory: "512Mi"
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8080
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 8080
+            initialDelaySeconds: 5
+            periodSeconds: 5
+---
+# Chat Server Service
+apiVersion: v1
+kind: Service
+metadata:
+  name: chat-server
+  namespace: chimera
+spec:
+  selector:
+    app: chat-server
+  ports:
+    - port: 8080
+      targetPort: 8080
+  type: ClusterIP
+---
+# HPA for Chat Server
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: chat-server-hpa
+  namespace: chimera
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: chat-server
+  minReplicas: 3
+  maxReplicas: 10
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: 70
+    - type: Resource
+      resource:
+        name: memory
+        target:
+          type: Utilization
+          averageUtilization: 80
+---
+# Crypto Service Deployment
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: crypto-service
+  namespace: chimera
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: crypto-service
+  template:
+    metadata:
+      labels:
+        app: crypto-service
+    spec:
+      containers:
+        - name: crypto-service
+          image: chimera/crypto-service:latest
+          ports:
+            - containerPort: 8081
+          env:
+            - name: PORT
+              value: "8081"
+            - name: RUST_LOG
+              value: "info"
+          resources:
+            requests:
+              cpu: "100m"
+              memory: "128Mi"
+            limits:
+              cpu: "500m"
+              memory: "256Mi"
+---
+# Crypto Service
+apiVersion: v1
+kind: Service
+metadata:
+  name: crypto-service
+  namespace: chimera
+spec:
+  selector:
+    app: crypto-service
+  ports:
+    - port: 8081
+      targetPort: 8081
+---
+# ML Service Deployment
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ml-service
+  namespace: chimera
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: ml-service
+  template:
+    metadata:
+      labels:
+        app: ml-service
+    spec:
+      containers:
+        - name: ml-service
+          image: chimera/ml-service:latest
+          ports:
+            - containerPort: 8082
+          env:
+            - name: PORT
+              value: "8082"
+            - name: NATS_URL
+              value: "nats://nats:4222"
+            - name: REDIS_URL
+              value: "redis://redis:6379"
+          resources:
+            requests:
+              cpu: "250m"
+              memory: "512Mi"
+            limits:
+              cpu: "1000m"
+              memory: "1Gi"
+---
+# ML Service
+apiVersion: v1
+kind: Service
+metadata:
+  name: ml-service
+  namespace: chimera
+spec:
+  selector:
+    app: ml-service
+  ports:
+    - port: 8082
+      targetPort: 8082
+---
+# NATS Deployment
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: nats
+  namespace: chimera
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: nats
+  template:
+    metadata:
+      labels:
+        app: nats
+    spec:
+      containers:
+        - name: nats
+          image: nats:alpine
+          args: ["--jetstream", "--http_port", "8222"]
+          ports:
+            - containerPort: 4222
+            - containerPort: 8222
+---
+# NATS Service
+apiVersion: v1
+kind: Service
+metadata:
+  name: nats
+  namespace: chimera
+spec:
+  selector:
+    app: nats
+  ports:
+    - name: client
+      port: 4222
+    - name: monitor
+      port: 8222
+---
+# Redis Deployment
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: redis
+  namespace: chimera
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: redis
+  template:
+    metadata:
+      labels:
+        app: redis
+    spec:
+      containers:
+        - name: redis
+          image: redis:alpine
+          args: ["--appendonly", "yes"]
+          ports:
+            - containerPort: 6379
+          volumeMounts:
+            - name: redis-data
+              mountPath: /data
+      volumes:
+        - name: redis-data
+          persistentVolumeClaim:
+            claimName: redis-pvc
+---
+# Redis PVC
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: redis-pvc
+  namespace: chimera
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 5Gi
+---
+# Redis Service
+apiVersion: v1
+kind: Service
+metadata:
+  name: redis
+  namespace: chimera
+spec:
+  selector:
+    app: redis
+  ports:
+    - port: 6379
+---
+# Ingress
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: chimera-ingress
+  namespace: chimera
+  annotations:
+    nginx.ingress.kubernetes.io/websocket-services: "chat-server"
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "3600"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "3600"
+spec:
+  rules:
+    - host: chimera.local
+      http:
+        paths:
+          - path: /ws
+            pathType: Prefix
+            backend:
+              service:
+                name: chat-server
+                port:
+                  number: 8080
+          - path: /api/chat
+            pathType: Prefix
+            backend:
+              service:
+                name: chat-server
+                port:
+                  number: 8080
+          - path: /api/crypto
+            pathType: Prefix
+            backend:
+              service:
+                name: crypto-service
+                port:
+                  number: 8081
+          - path: /api/ml
+            pathType: Prefix
+            backend:
+              service:
+                name: ml-service
+                port:
+                  number: 8082

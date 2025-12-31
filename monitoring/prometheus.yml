@@ -1,0 +1,46 @@
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+
+alerting:
+  alertmanagers:
+    - static_configs:
+        - targets: []
+
+rule_files: []
+
+scrape_configs:
+  # Prometheus self-monitoring
+  - job_name: "prometheus"
+    static_configs:
+      - targets: ["localhost:9090"]
+
+  # Chat servers
+  - job_name: "chat-server"
+    static_configs:
+      - targets: ["chat-server:8080"]
+    metrics_path: /metrics
+    scrape_interval: 5s
+
+  # Crypto service
+  - job_name: "crypto-service"
+    static_configs:
+      - targets: ["crypto-service:8081"]
+    metrics_path: /metrics
+
+  # ML service
+  - job_name: "ml-service"
+    static_configs:
+      - targets: ["ml-service:8082"]
+    metrics_path: /metrics
+
+  # NATS
+  - job_name: "nats"
+    static_configs:
+      - targets: ["nats:8222"]
+    metrics_path: /varz
+
+  # Redis
+  - job_name: "redis"
+    static_configs:
+      - targets: ["redis:6379"]

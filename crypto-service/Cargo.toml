@@ -1,0 +1,44 @@
+[package]
+name = "chimera-crypto"
+version = "1.0.0"
+edition = "2021"
+description = "Project Chimera - Cryptographic Service"
+authors = ["Lord Wilson"]
+
+[dependencies]
+# Web framework
+axum = "0.7"
+tokio = { version = "1", features = ["full"] }
+tower = "0.4"
+tower-http = { version = "0.5", features = ["cors", "trace"] }
+
+# Cryptography
+ed25519-dalek = { version = "2", features = ["rand_core"] }
+chacha20poly1305 = "0.10"
+argon2 = "0.5"
+rand = "0.8"
+base64 = "0.21"
+
+# Data
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+uuid = { version = "1", features = ["v4"] }
+
+# Redis
+redis = { version = "0.24", features = ["tokio-comp"] }
+
+# NATS
+async-nats = "0.33"
+
+# Observability
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+prometheus = "0.13"
+
+# Error handling
+thiserror = "1"
+anyhow = "1"
+
+[profile.release]
+lto = true
+opt-level = 3
